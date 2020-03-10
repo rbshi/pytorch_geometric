@@ -1,7 +1,7 @@
 from .karate import KarateClub
 from .tu_dataset import TUDataset
 from .planetoid import Planetoid
-from .cora_full import CoraFull
+from .citation_full import CitationFull, CoraFull
 from .coauthor import Coauthor
 from .amazon import Amazon
 from .ppi import PPI
@@ -28,11 +28,14 @@ from .willow_object_class import WILLOWObjectClass
 from .dbp15k import DBP15K
 from .pascal import PascalVOCKeypoints
 from .pascal_pf import PascalPF
+from .snap_dataset import SNAPDataset
+from .suite_sparse import SuiteSparseMatrixCollection
 
 __all__ = [
     'KarateClub',
     'TUDataset',
     'Planetoid',
+    'CitationFull',
     'CoraFull',
     'Coauthor',
     'Amazon',
@@ -60,4 +63,6 @@ __all__ = [
     'WILLOWObjectClass',
     'PascalVOCKeypoints',
     'PascalPF',
+    'SNAPDataset',
+    'SuiteSparseMatrixCollection',
 ]
