@@ -95,8 +95,17 @@ def train():
 def test():
     # time measurement
     t_start = time.perf_counter()
+    if args.device == 'cuda':
+        gpu_start = torch.cuda.Event(enable_timing=True)
+        gpu_end = torch.cuda.Event(enable_timing=True)
+        gpu_start.record()
     model.eval()
-    exe_time = time.perf_counter() - t_start
+    exe_time = (time.perf_counter() - t_start)*1000
+    if args.device == 'cuda':
+        gpu_end.record()
+        torch.cuda.synchronize()
+        exe_time = gpu_start.elapsed_time(gpu_end)
+
     logits, accs = model(), []
     for _, mask in data('train_mask', 'val_mask', 'test_mask'):
         pred = logits[mask].max(1)[1]
@@ -123,4 +132,4 @@ else:
     [train_acc, val_acc, test_acc], exe_time = test()
     log = 'Test: {:.4f}'
     print(log.format(test_acc))
-    print("Time:" + str(exe_time))
+    print("Time (ms):" + str(exe_time))
