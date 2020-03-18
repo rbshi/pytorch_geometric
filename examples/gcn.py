@@ -16,6 +16,8 @@ parser.add_argument('--dataset', default='Cora',
                     help='Define the dataset.')
 parser.add_argument('--runmode', default='train',
                     help='Define the runmode (train/test)')
+parser.add_argument('--niter', default=100,
+                    help='Define the iteration number in training.')
 parser.add_argument('--device', default='cpu',
                     help='Define the device.')
 parser.add_argument('--hsize', default=16,
@@ -117,7 +119,7 @@ def test():
 best_val_acc = test_acc = 0
 
 if args.runmode == 'train':
-    for epoch in range(1, 100):
+    for epoch in range(1, int(args.niter)):
         train()
         [train_acc, val_acc, tmp_test_acc], exe_time = test()
         if val_acc > best_val_acc:
