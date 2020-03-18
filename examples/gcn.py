@@ -31,7 +31,7 @@ else:
     dataset = Planetoid(path, dataset_name, T.NormalizeFeatures())
 data = dataset[0]
 
-model_path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'models', dataset_name + '-' + str(args.hsize))
+model_path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'models', dataset_name+'-'+str(args.hsize)+'.pth')
 
 if args.use_gdc:
     gdc = T.GDC(self_loop_weight=1, normalization_in='sym',
