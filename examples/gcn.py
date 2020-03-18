@@ -4,18 +4,34 @@ import argparse
 import torch
 import torch.nn.functional as F
 from torch_geometric.datasets import Planetoid
+from torch_geometric.datasets import Reddit
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv, ChebConv  # noqa
+import time
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--use_gdc', action='store_true',
                     help='Use GDC preprocessing.')
+parser.add_argument('--dataset', default='Cora',
+                    help='Define the dataset.')
+parser.add_argument('--runmode', default='train',
+                    help='Define the runmode (train/test)')
+parser.add_argument('--device', default='cpu',
+                    help='Define the device.')
+parser.add_argument('--hsize', default=16,
+                    help='Define the hidden representation vector length.')
 args = parser.parse_args()
 
-dataset = 'Cora'
-path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', dataset)
-dataset = Planetoid(path, dataset, T.NormalizeFeatures())
+# obtain the proper dataset
+dataset_name=args.dataset
+path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', dataset_name)
+if args.dataset=='Reddit':
+    dataset = Reddit(path)
+else:
+    dataset = Planetoid(path, dataset_name, T.NormalizeFeatures())
 data = dataset[0]
+
+model_path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'models', dataset_name + '-' + str(args.hsize))
 
 if args.use_gdc:
     gdc = T.GDC(self_loop_weight=1, normalization_in='sym',
@@ -25,13 +41,14 @@ if args.use_gdc:
                                            dim=0), exact=True)
     data = gdc(data)
 
+hsize=int(args.hsize)
 
 class Net(torch.nn.Module):
     def __init__(self):
         super(Net, self).__init__()
-        self.conv1 = GCNConv(dataset.num_features, 16, cached=True,
+        self.conv1 = GCNConv(dataset.num_features, hsize, cached=True,
                              normalize=not args.use_gdc)
-        self.conv2 = GCNConv(16, dataset.num_classes, cached=True,
+        self.conv2 = GCNConv(hsize, dataset.num_classes, cached=True,
                              normalize=not args.use_gdc)
         # self.conv1 = ChebConv(data.num_features, 16, K=2)
         # self.conv2 = ChebConv(16, data.num_features, K=2)
@@ -46,14 +63,26 @@ class Net(torch.nn.Module):
         x = self.conv2(x, edge_index, edge_weight)
         return F.log_softmax(x, dim=1)
 
+if args.device=='cpu':
+    device = torch.device('cpu')
+else:
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model, data = Net().to(device), data.to(device)
-optimizer = torch.optim.Adam([
-    dict(params=model.reg_params, weight_decay=5e-4),
-    dict(params=model.non_reg_params, weight_decay=0)
-], lr=0.01)
-
+if args.runmode == 'train':
+    model, data = Net().to(device), data.to(device)
+    optimizer = torch.optim.Adam([
+        dict(params=model.reg_params, weight_decay=5e-4),
+        dict(params=model.non_reg_params, weight_decay=0)
+    ], lr=0.01)
+else:
+    model = Net()
+    model.load_state_dict(torch.load(model_path))
+    model.to(device)
+    data = data.to(device)
+    optimizer = torch.optim.Adam([
+        dict(params=model.reg_params, weight_decay=5e-4),
+        dict(params=model.non_reg_params, weight_decay=0)
+    ], lr=0.01)
 
 def train():
     model.train()
@@ -64,21 +93,34 @@ def train():
 
 @torch.no_grad()
 def test():
+    # time measurement
+    t_start = time.perf_counter()
     model.eval()
+    exe_time = time.perf_counter() - t_start
     logits, accs = model(), []
     for _, mask in data('train_mask', 'val_mask', 'test_mask'):
         pred = logits[mask].max(1)[1]
         acc = pred.eq(data.y[mask]).sum().item() / mask.sum().item()
         accs.append(acc)
-    return accs
+    return accs, exe_time
 
 
 best_val_acc = test_acc = 0
-for epoch in range(1, 201):
-    train()
-    train_acc, val_acc, tmp_test_acc = test()
-    if val_acc > best_val_acc:
-        best_val_acc = val_acc
-        test_acc = tmp_test_acc
-    log = 'Epoch: {:03d}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}'
-    print(log.format(epoch, train_acc, best_val_acc, test_acc))
+
+if args.runmode == 'train':
+    for epoch in range(1, 100):
+        train()
+        [train_acc, val_acc, tmp_test_acc], exe_time = test()
+        if val_acc > best_val_acc:
+            best_val_acc = val_acc
+            test_acc = tmp_test_acc
+        log = 'Epoch: {:03d}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}'
+        print(log.format(epoch, train_acc, best_val_acc, test_acc))
+    # save the PyTorch model
+    torch.save(model.state_dict(), model_path)
+    print("Model saved.")
+else:
+    [train_acc, val_acc, test_acc], exe_time = test()
+    log = 'Test: {:.4f}'
+    print(log.format(test_acc))
+    print("Time:" + str(exe_time))
