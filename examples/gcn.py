@@ -101,7 +101,12 @@ def test():
         gpu_start = torch.cuda.Event(enable_timing=True)
         gpu_end = torch.cuda.Event(enable_timing=True)
         gpu_start.record()
-    logits, accs = model(), []
+    # FIXME: test 100 iteration for a precise measurement
+    if args.runmode == 'test':
+        for ii in range(0, 100):
+            logits, accs = model(), []
+    else:
+        logits, accs = model(), []
     if args.device == 'cpu':
         exe_time = (time.perf_counter() - t_start)*1000
     else:

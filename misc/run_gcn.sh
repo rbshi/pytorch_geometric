@@ -24,18 +24,19 @@ pip install torch torchvision
 # change +cu101 to your current CUDA version.
 pip install torch-scatter==latest+cu101 torch-sparse==latest+cu101 torch-cluster==latest+cu101 torch-spline-conv==latest+cu101 -f https://s3.eu-central-1.amazonaws.com/pytorch-geometric.com/whl/torch-1.4.0.html
 # setup local PyG
-python ../setup.py install
+python $PYG_ROOT_PATH/setup.py install
 
 echo "STEP2: Download pre-trained models"
 cd $PYG_ROOT_PATH/models || exit
-wget -N https://github.com/rbshi/public/raw/master/models/gcn/Cora-16.pth
-wget -N https://github.com/rbshi/public/raw/master/models/gcn/CiteSeer-16.pth
-wget -N https://github.com/rbshi/public/raw/master/models/gcn/Pubmed-16.pth
-wget -N https://github.com/rbshi/public/raw/master/models/gcn/Reddit-64.pth
-wget -N https://github.com/rbshi/public/raw/master/models/gcn/Nell-64.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Cora-16.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/CiteSeer-16.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Pubmed-16.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Reddit-64.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Nell-64.pth
+cd  $PYG_ROOT_PATH/misc || exit
 
+echo "STEP3: Test evaluation"
 rm -f $2
-
 IFS=","
 sed 1d $1 | while read dataset hiddensize encpu engpu na1 na2 ; do
   echo -e "dataset: $dataset \t hiddensize: $hiddensize"
@@ -46,11 +47,13 @@ sed 1d $1 | while read dataset hiddensize encpu engpu na1 na2 ; do
     time_cpu=${res_cpu: 10}
   fi
   if [ $engpu = 1 ]; then
-    #FIXME: get GPU time
-    res_gpu=$(python $PYG_ROOT_PATH/examples/gcn.py --dataset $dataset --hsize $hiddensize --runmode test --device cpu)
+    # get GPU time
+    res_gpu=$(python $PYG_ROOT_PATH/examples/gcn.py --dataset $dataset --hsize $hiddensize --runmode test --device cuda)
     time_gpu=${res_gpu: 10}
   fi
   echo -e "$time_cpu\t $time_gpu" >> $2
 done
+
+echo "Done"
 
 
