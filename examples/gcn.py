@@ -62,6 +62,7 @@ class Net(torch.nn.Module):
     def forward(self):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr
         x = F.relu(self.conv1(x, edge_index, edge_weight))
+        # 0 dropout in Nell dataset
         # x = F.dropout(x, training=self.training)
         x = self.conv2(x, edge_index, edge_weight)
         return F.log_softmax(x, dim=1)
@@ -74,18 +75,14 @@ else:
 if args.runmode == 'train':
     model, data = Net().to(device), data.to(device)
     optimizer = torch.optim.Adam([
-        dict(params=model.reg_params, weight_decay=1e-6),
+        dict(params=model.reg_params, weight_decay=1e-5),
         dict(params=model.non_reg_params, weight_decay=0)
-    ], lr=0.00005)
+    ], lr=0.0005)
 else:
     model = Net()
     model.load_state_dict(torch.load(model_path))
     model.to(device)
     data = data.to(device)
-    # optimizer = torch.optim.Adam([
-    #     dict(params=model.reg_params, weight_decay=5e-4),
-    #     dict(params=model.non_reg_params, weight_decay=0)
-    # ], lr=0.01)
 
 def train():
     model.train()
@@ -98,14 +95,16 @@ def train():
 def test():
     model.eval()
     # time measurement
-    if args.device == 'cuda':
+    if args.device == 'cpu':
+        t_start = time.perf_counter()
+    else:
         gpu_start = torch.cuda.Event(enable_timing=True)
         gpu_end = torch.cuda.Event(enable_timing=True)
         gpu_start.record()
-    t_start = time.perf_counter()
     logits, accs = model(), []
-    exe_time = (time.perf_counter() - t_start)*1000
-    if args.device == 'cuda':
+    if args.device == 'cpu':
+        exe_time = (time.perf_counter() - t_start)*1000
+    else:
         gpu_end.record()
         torch.cuda.synchronize()
         exe_time = gpu_start.elapsed_time(gpu_end)
@@ -134,5 +133,5 @@ if args.runmode == 'train':
 else:
     [train_acc, val_acc, test_acc], exe_time = test()
     log = 'Test: {:.4f}'
-    print(log.format(test_acc))
-    print("Time (ms):" + str(exe_time))
+    # print(log.format(test_acc))
+    print("Time (ms):" + str(round(exe_time, 2)))
