@@ -5,6 +5,7 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.datasets import Planetoid
 from torch_geometric.datasets import Reddit
+from torch_geometric.data import download_url
 import torch_geometric.transforms as T
 from torch_geometric.nn import GCNConv, ChebConv  # noqa
 import time
@@ -27,7 +28,7 @@ args = parser.parse_args()
 # obtain the proper dataset
 dataset_name=args.dataset
 path = osp.join(osp.dirname(osp.realpath(__file__)), '..', 'data', dataset_name)
-if args.dataset=='Reddit':
+if args.dataset.lower()=='reddit':
     dataset = Reddit(path)
 else:
     dataset = Planetoid(path, dataset_name, T.NormalizeFeatures())
@@ -61,7 +62,7 @@ class Net(torch.nn.Module):
     def forward(self):
         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr
         x = F.relu(self.conv1(x, edge_index, edge_weight))
-        x = F.dropout(x, training=self.training)
+        # x = F.dropout(x, training=self.training)
         x = self.conv2(x, edge_index, edge_weight)
         return F.log_softmax(x, dim=1)
 
@@ -73,18 +74,18 @@ else:
 if args.runmode == 'train':
     model, data = Net().to(device), data.to(device)
     optimizer = torch.optim.Adam([
-        dict(params=model.reg_params, weight_decay=5e-4),
+        dict(params=model.reg_params, weight_decay=1e-6),
         dict(params=model.non_reg_params, weight_decay=0)
-    ], lr=0.01)
+    ], lr=0.00005)
 else:
     model = Net()
     model.load_state_dict(torch.load(model_path))
     model.to(device)
     data = data.to(device)
-    optimizer = torch.optim.Adam([
-        dict(params=model.reg_params, weight_decay=5e-4),
-        dict(params=model.non_reg_params, weight_decay=0)
-    ], lr=0.01)
+    # optimizer = torch.optim.Adam([
+    #     dict(params=model.reg_params, weight_decay=5e-4),
+    #     dict(params=model.non_reg_params, weight_decay=0)
+    # ], lr=0.01)
 
 def train():
     model.train()
@@ -95,20 +96,20 @@ def train():
 
 @torch.no_grad()
 def test():
+    model.eval()
     # time measurement
-    t_start = time.perf_counter()
     if args.device == 'cuda':
         gpu_start = torch.cuda.Event(enable_timing=True)
         gpu_end = torch.cuda.Event(enable_timing=True)
         gpu_start.record()
-    model.eval()
+    t_start = time.perf_counter()
+    logits, accs = model(), []
     exe_time = (time.perf_counter() - t_start)*1000
     if args.device == 'cuda':
         gpu_end.record()
         torch.cuda.synchronize()
         exe_time = gpu_start.elapsed_time(gpu_end)
 
-    logits, accs = model(), []
     for _, mask in data('train_mask', 'val_mask', 'test_mask'):
         pred = logits[mask].max(1)[1]
         acc = pred.eq(data.y[mask]).sum().item() / mask.sum().item()

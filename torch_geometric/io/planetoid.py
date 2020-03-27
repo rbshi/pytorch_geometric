@@ -8,6 +8,8 @@ from torch_geometric.data import Data
 from torch_geometric.io import read_txt_array
 from torch_geometric.utils import remove_self_loops
 
+import torch.nn.functional as f
+
 try:
     import cPickle as pickle
 except ImportError:
@@ -35,11 +37,40 @@ def read_planetoid_data(folder, prefix):
 
         tx, ty = tx_ext, ty_ext
 
-    x = torch.cat([allx, tx], dim=0)
-    y = torch.cat([ally, ty], dim=0).max(dim=1)[1]
+    # --rbshi
+    if prefix.lower() == 'nell':
+        print("Processing Nell dataset with matrix concatenation.")
 
-    x[test_index] = x[sorted_test_index]
-    y[test_index] = y[sorted_test_index]
+        exclu_rang = []
+        for i in range(allx.size(0), len(graph)):
+            if i not in test_index:
+                exclu_rang.append(i)
+
+        # concatenation the feature and label matrix as follows,
+        # | allx  | 0  |
+        # | tx    | 0  |
+        # | ------+--- |
+        # | 0     | I  |
+
+        len_ext = len(graph)-tx.size(0)-allx.size(0)
+        x_hext = torch.cat([torch.cat([allx, tx], dim=0), torch.zeros(allx.size(0)+tx.size(0), len_ext)], dim=1)
+        x_vext = torch.cat([torch.zeros(len_ext, tx.size(1)), torch.eye(len_ext)], dim=1)
+        x = torch.cat([x_hext, x_vext], dim=0)
+        y = torch.cat([ally, ty, torch.zeros(len_ext, ty.size(1))], dim=0).max(dim=1)[1]
+
+        # x[test_index] = x[sorted_test_index]
+        # y[test_index] = y[sorted_test_index]
+
+        x[test_index.tolist() + exclu_rang, :] = x[range(allx.size(0), len(graph)), :]
+        y[test_index.tolist() + exclu_rang] = y[range(ally.size(0), len(graph))]
+
+        # x = f.normalize(x, p=1, dim=1)
+
+    else:
+        x = torch.cat([allx, tx], dim=0)
+        y = torch.cat([ally, ty], dim=0).max(dim=1)[1]
+        x[test_index] = x[sorted_test_index]
+        y[test_index] = y[sorted_test_index]
 
     train_mask = index_to_mask(train_index, size=y.size(0))
     val_mask = index_to_mask(val_index, size=y.size(0))
@@ -56,7 +87,11 @@ def read_planetoid_data(folder, prefix):
 
 
 def read_file(folder, prefix, name):
-    path = osp.join(folder, 'ind.{}.{}'.format(prefix.lower(), name))
+    # --rbshi
+    if prefix.lower() == 'nell':
+        path = osp.join(folder, 'ind.{}.0.001.{}'.format(prefix.lower(), name))
+    else:
+        path = osp.join(folder, 'ind.{}.{}'.format(prefix.lower(), name))
 
     if name == 'test.index':
         return read_txt_array(path, dtype=torch.long)
