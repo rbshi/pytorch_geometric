@@ -1,0 +1,6 @@
+Dataset,HiddenSize,EnCPU,EnGPU,CPU,GPU
+Cora,16,1,0,,
+CiteSeer,16,1,1,,
+Pubmed,16,0,1,,
+Nell,64,1,1,,
+Reddit,64,1,1,,
