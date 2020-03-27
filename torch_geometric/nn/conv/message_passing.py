@@ -31,7 +31,7 @@ class MessagePassing(torch.nn.Module):
     .. math::
         \mathbf{x}_i^{\prime} = \gamma_{\mathbf{\Theta}} \left( \mathbf{x}_i,
         \square_{j \in \mathcal{N}(i)} \, \phi_{\mathbf{\Theta}}
-        \left(\mathbf{x}_i, \mathbf{x}_j,\mathbf{e}_{i,j}\right) \right),
+        \left(\mathbf{x}_i, \mathbf{x}_j,\mathbf{e}_{j,i}\right) \right),
 
     where :math:`\square` denotes a differentiable, permutation invariant
     function, *e.g.*, sum, mean or max, and :math:`\gamma_{\mathbf{\Theta}}`
@@ -50,6 +50,7 @@ class MessagePassing(torch.nn.Module):
         node_dim (int, optional): The axis along which to propagate.
             (default: :obj:`0`)
     """
+
     def __init__(self, aggr="add", flow="source_to_target", node_dim=0):
         super(MessagePassing, self).__init__()
 
@@ -87,6 +88,10 @@ class MessagePassing(torch.nn.Module):
                                          update_args)
 
         self.__fuse__ = True
+
+        # Support for GNNExplainer.
+        self.__explain__ = False
+        self.__edge_mask__ = None
 
     def __get_mp_type__(self, edge_index):
         if (torch.is_tensor(edge_index) and edge_index.dtype == torch.long
@@ -245,7 +250,7 @@ class MessagePassing(torch.nn.Module):
         kwargs = self.__collect__(edge_index, size, mp_type, kwargs)
 
         # Try to run `message_and_aggregate` first and see if it succeeds:
-        if mp_type == 'adj_t' and self.__fuse__ is True:
+        if mp_type == 'adj_t' and self.__fuse__ and not self.__explain__:
             msg_aggr_kwargs = self.__distribute__(self.__msg_aggr_params__,
                                                   kwargs)
             out = self.message_and_aggregate(**msg_aggr_kwargs)
@@ -253,9 +258,17 @@ class MessagePassing(torch.nn.Module):
                 self.__fuse__ = False
 
         # Otherwise, run both functions in separation.
-        if mp_type == 'edge_index' or self.__fuse__ is False:
+        if mp_type == 'edge_index' or not self.__fuse__ or self.__explain__:
             msg_kwargs = self.__distribute__(self.__msg_params__, kwargs)
             out = self.message(**msg_kwargs)
+
+            if self.__explain__:
+                edge_mask = self.__edge_mask__.sigmoid()
+                if out.size(0) != edge_mask.size(0):
+                    loop = edge_mask.new_ones(size[0])
+                    edge_mask = torch.cat([edge_mask, loop], dim=0)
+                assert out.size(0) == edge_mask.size(0)
+                out = out * edge_mask.view(-1, 1)
 
             aggr_kwargs = self.__distribute__(self.__aggr_params__, kwargs)
             out = self.aggregate(out, **aggr_kwargs)
