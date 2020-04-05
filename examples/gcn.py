@@ -102,7 +102,7 @@ def test():
         gpu_end = torch.cuda.Event(enable_timing=True)
         gpu_start.record()
     # FIXME: test 100 iteration for a precise measurement
-    if args.runmode == 'test':
+    if args.runmode == 'test' and args.dataset != 'Reddit':
         for ii in range(0, 100):
             logits, accs = model(), []
     else:

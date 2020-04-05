@@ -1,6 +1,6 @@
 #!/bin/bash
 
-PYG_ROOT_PATH=$(cd `dirname $0 || exit`; pwd)/..
+PYG_ROOT_PATH=$(cd `dirname $0` || exit; pwd)/..
 
 # check arguments
 if [ $# != 2 ]; then
@@ -33,6 +33,11 @@ wget -nc https://github.com/rbshi/public/raw/master/models/gcn/CiteSeer-16.pth
 wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Pubmed-16.pth
 wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Reddit-64.pth
 wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Nell-64.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Cora-128.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/CiteSeer-128.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Pubmed-128.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Reddit-128.pth
+wget -nc https://github.com/rbshi/public/raw/master/models/gcn/Nell-128.pth
 cd  $PYG_ROOT_PATH/misc || exit
 
 echo "STEP3: Test evaluation"
