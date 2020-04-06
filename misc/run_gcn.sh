@@ -20,9 +20,9 @@ if ! [ -x "$(command -v pip)" ]; then
 fi
 
 echo "STEP1: Install dependencies."
-pip install torch torchvision
+pip install torch torchvision --user
 # change +cu101 to your current CUDA version.
-pip install torch-scatter==latest+cu101 torch-sparse==latest+cu101 torch-cluster==latest+cu101 torch-spline-conv==latest+cu101 -f https://s3.eu-central-1.amazonaws.com/pytorch-geometric.com/whl/torch-1.4.0.html
+pip install torch-scatter==latest+cu101 torch-sparse==latest+cu101 torch-cluster==latest+cu101 torch-spline-conv==latest+cu101 -f https://s3.eu-central-1.amazonaws.com/pytorch-geometric.com/whl/torch-1.4.0.html --user
 # setup local PyG
 python $PYG_ROOT_PATH/setup.py install
 
